@@ -1,0 +1,15 @@
+{
+  "name": "group-manager",
+  "version": "1.0.0",
+  "description": "Group manager for Arch Markets group",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "sqlite3": "^5.1.2",
+    "telegraf": "^4.11.2"
+  }
+}
