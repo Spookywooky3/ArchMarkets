@@ -1,5 +1,5 @@
-const { Telegraf, Markup } = require('telegraf');
-const { message, editedMessage, channelPost, editedChannelPost, callbackQuery } = require('telegraf/filters');
+const { Telegraf, Markup, Scenes } = require('telegraf');
+const { message } = require('telegraf/filters');
 const { MongoClient } = require('mongodb');
 
 // Configuration, will make commandline args later
@@ -7,7 +7,6 @@ const bot = new Telegraf("5453290085:AAGYSe5bgAMUZh_Mrmu-ylJzjmqaaqJWMFI");
 const dbUri = "mongodb://127.0.0.1:27017";
 
 // Connect to DB
-
 const client = new MongoClient(dbUri);
 try {
     client.connect();
@@ -18,16 +17,52 @@ try {
     console.log(error);
 }
 
-//Bot middleware
-bot.catch(async (error, ctx) => {
-    await next();
+// Bot scenes
+const verifyScene = new Scenes.WizardScene('verification_wizard_scene',
+    async ctx => {
+        ctx.reply('*HOW TO VERIFY*\nSimply send your location via the button below to confirm you are in Western Australia\\.\n\n*PLEASE NOTE YOU MAY SEND THIS LOCATION ANYWHERE WITHIN WESTERN AUSTRALIA, ' +
+            'WE DO NOT STORE ANY LOCATION DATA\\.*', Markup.keyboard([
+                    Markup.button.locationRequest('Verify Location'),
+                    Markup.button.text('Cancel Verification')
+                ]).oneTime().resize()
+        );
+        return ctx.wizard.next();
+    },
+    async ctx => {
+        console.log(ctx.message);
+        return await ctx.scene.leave();
+    }
+);
+
+const stage = new Scenes.Stage([verifyScene]);
+
+stage.command('verify', async (ctx) => {
+    if (ctx.from.username == undefined || ctx.from.username == "") {
+        ctx.reply('Please set a username for your account first before joining and verifying.');
+        return;
+    }
+
+    let query = { user: { username: ctx.from.username, user_id: ctx.from.id } }
+    let userDocument = await client.db('arch').collection('users').findOne(query);
+    console.log(userDocument);
+    if (userDocument == null) {
+        ctx.reply('You must join one of our groups first. t.me/ArchMarkets');
+        return;
+    }
+
+    console.log('test');
+    await ctx.scene.start('verification_wizard_scene');
 });
+
+bot.use(stage.middleware());
 
 // Bot Interactions
 bot.start( async (ctx) => {
     let welcomeFooter = "*Commands*\n/vouches \\- *Check a users reputation\\.*\n\nt\\.me/ArchMarkets";
     ctx.replyWithMarkdownV2(`Thank you for choosing to join the Arch Markets${ctx.chat.username != "" ? `, *@${ctx.chat.username}*\\.\n\n` + `${welcomeFooter}` : "\\. *Please create a username for your account before attempting to join\\.*" + `${welcomeFooter}` }`);
 });
+
+bot.command('quit', async (ctx) => { await ctx.leaveChat(); });
 
 bot.command('addtodb', async (ctx) => {
     // Add roles eventually
@@ -84,8 +119,6 @@ bot.command('updategroup', async (ctx) => {
     }
 });
 
-bot.command('quit', async (ctx) => { await ctx.leaveChat(); });
-
 // Group Interactions
 bot.on(message('new_chat_members'), async (ctx) => {
     try {
@@ -133,9 +166,6 @@ bot.on(message('left_chat_member'), async (ctx) => {
 
     }
 });
-
-// API interactions
-bot.on(message(''))
 
 bot.launch();
 console.log('[BOT] BOT STARTED');
